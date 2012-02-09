@@ -1,19 +1,240 @@
-package cmd
+package ed
 
 import (
-	"os"
+	"unicode"
+	"strconv"
 	"regexp"
+	"strings"
 	"fmt"
-	"bufio"
-	"./buf"
+	"os"
 )
 
-func parse(str string) cmd.Addr, cmd.Op {
-	addr, rest = parseAddr
+type ParseContext struct {
+	lastSearch *regexp.Regexp
+	lastReplace *string
+	lastSubstOpts *string
 }
 
-func parseAddr(str string) cmd.Addr, string {
-	if str.HasPrefix("/") {
-	
+func CmdParse(str string, buf *Buffer, ctx *ParseContext) (Range, Op) {
+	var oper Op
+	addr, rest := parseRange(str, buf, ctx)
+	if addr.line0 == -1 || addr.lineN == -1 {
+		var nop Nop
+		EdError("no match")
+		oper = &nop
+	} else {
+		oper, _ = parseOp(rest, buf, ctx)
 	}
+	return addr, oper
+}
+
+func parseRange(str string, buf *Buffer, ctx *ParseContext) (Range, string) {
+	var rest string
+	var line0, lineN int
+	line0, rest = consumeAddr(str, buf, -1, ctx)
+	//fmt.Fprintln(os.Stderr, "parseRange(\"", str, "\"):", rest, line0)
+	if len(rest) > 0 && rest[0] == ',' {
+		lineN, rest = consumeAddr(rest[1:], buf, line0, ctx)
+	} else {
+		lineN = line0
+	}
+	//fmt.Fprintln(os.Stderr, "parseRange:", rest, lineN)
+	return MkRange(line0, lineN), rest
+}
+
+func consumeAddr(str string, buf *Buffer, line0 int, ctx *ParseContext) (int, string) {
+	var searchStart int
+	var defaultLine int
+	if line0 == -1 {
+		searchStart = buf.Dot()
+		defaultLine = buf.Dot()
+	} else {
+		searchStart = line0
+		defaultLine = buf.NumLines()-1
+	}
+	if len(str) > 0 {
+		switch {
+			case str[0] == '/' || str[0] == '?':
+				re, rest, _ := consumeRegex(str)
+				if len(re) > 0 {
+					regex, err := regexp.Compile(re)
+					if err != nil {
+						return -1, rest
+					}
+					ctx.lastSearch = regex
+				} else if ctx.lastSearch == nil {
+					return -1, rest
+				}
+				if str[0] == '/' {
+					return buf.SearchForward(ctx.lastSearch, searchStart), rest
+				} else {
+					return buf.SearchBackward(ctx.lastSearch, searchStart), rest
+				}
+			case str[0] == '^':
+				return 0, str[1:]
+			case str[0] == ',' && line0 == -1:
+				return 0, str
+			case str[0] == '$':
+				return buf.NumLines()-1, str[1:]
+			case str[0] == '.':
+				return buf.Dot(), str[1:]
+			case unicode.IsDigit(int(str[0])):
+				num, rest := consumeNumber(str)
+				i, _ := strconv.Atoi(num)
+				return i-1, rest
+			case str[0] == '-' || str[0] == '+':
+				num, rest := consumeNumber(str[1:])
+				num = str[0:1] + num
+				i, _ := strconv.Atoi(num)
+				return buf.Dot() + i, rest
+		}
+	}
+	return defaultLine, str
+}
+
+/* returns the regex string, any remaining characters, and whether a terminating delimiter was found */
+func consumeRegex(str string) (string, string, bool) {
+	var i int
+	delim := str[0]
+	for i = 1; i < len(str) && str[i] != delim; i++ {
+		if str[i] == '\\' {
+			i++
+		}
+	}
+	if i >= len(str) {
+		return str[1:], "", false
+	}
+	return str[1:i], str[i+1:], true
+}
+
+func consumeNumber(str string) (string, string) {
+	var i int
+	for i = 0; i < len(str) && unicode.IsDigit(int(str[i])); i++ {
+	}
+	return str[:i], str[i:]
+}
+
+func parseOp(str string, buf *Buffer, ctx *ParseContext) (Op, string) {
+	var o Op
+	var rest string
+	if len(str) < 1 {
+		str = "p"
+	}
+	switch c := str[0]; true {
+		case c == 'n':
+			o = MkLineOp(OpFnPrintN)
+			rest = str[1:]
+		case c == 'p':
+			o = MkLineOp(OpFnPrint)
+			rest = str[1:]
+		case c == 'q':
+			if buf.IsDirty() {
+				EdError("dirty buffer")
+				buf.dirty = false
+				o = new(Nop)
+			} else {
+				o = new(QuitOp)
+			}
+			rest = str[1:]
+		case c == 'r' || c == 'w':
+			var filename string
+			i := strings.Index(str, " ")
+			if i == -1 {
+				filename = buf.filename
+			} else {
+				filename = str[i+1:]
+			}
+			if filename == "" {
+				o = MkLineOp(MkOpFnErr("no filename"))
+			} else {
+				buf.filename = filename
+				if c == 'r' {
+					if buf.dirty {
+						EdError("dirty buffer")
+						buf.dirty = false
+						o = new(Nop)
+					} else {
+						o = NewReadOp(filename)
+					}
+				} else {
+					o = NewWriteOp(filename)
+				}
+			}
+			rest = ""
+		case c == 's':
+			var match, replace, opts string
+			var terminated, terminated2 bool
+			var err os.Error
+			var re *regexp.Regexp
+			opts = "1p"
+			if len(str) > 1 {
+				delim := str[1]
+				match, rest, terminated = consumeRegex(str[1:])
+				if len(match) > 0 {
+					re, err = regexp.Compile(match)
+				}
+				if err == nil {
+					if re != nil {
+						ctx.lastSearch = re
+					}
+					if terminated {
+						var o string
+						replace, o, terminated2 = consumeRegex(string(delim) + rest)
+						if terminated2 {
+							opts = o
+						}
+						ctx.lastReplace = &replace
+					}
+				}
+			}
+			if err != nil {
+				o = MkLineOp(MkOpFnErr("bad regex"))
+			} else if ctx.lastSearch == nil || ctx.lastReplace == nil {
+				o = MkLineOp(MkOpFnErr("no regex"))
+			} else {
+				o = MkLineOp(MkOpFnSubst(ctx.lastSearch, *ctx.lastReplace, opts))
+			}
+			rest = ""
+		case c == 'c':
+			o = NewInputOp(INPUT_CHANGE)
+			rest = str[1:]
+		case c == 'a':
+			o = NewInputOp(INPUT_APPEND)
+			rest = str[1:]
+		case c == 'i':
+			o = NewInputOp(INPUT_INSERT)
+			rest = str[1:]
+		case c == 'g':
+			search, subcmd, _ := consumeRegex(str[1:])
+			if len(subcmd) < 1 {
+				EdError("no command supplied for g//")
+				o = new(Nop)
+			} else if len(search) > 0 {
+				re, err := regexp.Compile(search)
+				if err != nil {
+					EdError("bad regex")
+					o = new(Nop)
+				}
+				ctx.lastSearch = re
+			} else if ctx.lastSearch == nil {
+				EdError("no regex")
+				o = new(Nop)
+			}
+			if o == nil {
+				var subop Op
+				subop, rest = parseOp(subcmd, buf, ctx)
+				lop, isLineOp := subop.(*LineOp)
+				if isLineOp {
+					o = MkLineOp(MkOpFnGlob(ctx.lastSearch, lop))
+				} else {
+					EdError(fmt.Sprint("can't use %c with g//", subcmd[1]))
+					o = new(Nop)
+				}
+			}	
+		default:
+			EdError(string(c) + ": unrecognised command")
+			o = new(Nop)
+			rest = ""
+	}
+	return o, rest
 }
