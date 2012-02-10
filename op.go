@@ -8,12 +8,6 @@ import (
 )
 
 const (
-	LINE_NOP = iota
-	LINE_DEL
-	LINE_REPLACE
-)
-
-const (
 	INPUT_INSERT = iota
 	INPUT_CHANGE
 	INPUT_APPEND
@@ -23,7 +17,7 @@ type Op interface {
 	Run(*Buffer, Range)
 }
 
-type LineOpFn func(int, string) (int, string)
+type LineOpFn func(int, *string) *string
 
 type LineOp struct {
 	fn LineOpFn
@@ -35,44 +29,44 @@ func MkLineOp(fn LineOpFn) Op {
 	return Op(&o)
 }
 
-func MkOpFnErr(err string) LineOpFn {
-	done := false
-	return func(linenum int, line string) (int, string) {
-		if done == false {
-			EdError(err + "\n")
-			done = true
-		}
-		return LINE_NOP, ""
-	}
-}
-
 func (op *LineOp) Run(buf *Buffer, r Range) {
+	deleted := make([]int, 0)
 	for i:=r.line0; i<=r.lineN; i++ {
-		act, str := op.fn(i, buf.GetLine(i))
-		switch {
-			case act == LINE_REPLACE:
-				buf.SetLine(i, str)
-			case act == LINE_NOP:
-				/* do nothing */
-			case act == LINE_DEL:
-				/* TODO */
+		line := buf.GetLine(i)
+		newLine := op.fn(i, &line)
+		if newLine != nil {
+			if newLine != &line {
+				buf.SetLine(i, *newLine)
+			}
+		} else {
+			deleted = append(deleted, i)
 		}
+	}
+	for i:=len(deleted)-1; i>=0; i-- {
+		_ = buf.DeleteLines(Range{deleted[i], deleted[i]})
 	}
 }
 
 
 /* n	- display line number and line contents */
-func OpFnPrintN(linenum int, line string) (int, string) {
-	os.Stdout.WriteString(strconv.Itoa(linenum+1) + "\t" + line + "\n")
-	return LINE_NOP, ""
+func OpFnPrintN(linenum int, line *string) *string {
+	os.Stdout.WriteString(strconv.Itoa(linenum+1) + "\t" + *line + "\n")
+	return line
 }
 
 
 /* p	- display line contents */
-func OpFnPrint(linenum int, line string) (int, string) {
-	os.Stdout.WriteString(line + "\n")
-	return LINE_NOP, ""
+func OpFnPrint(linenum int, line *string) *string {
+	os.Stdout.WriteString(*line + "\n")
+	return line
 }
+
+
+/* d	- delete lines */
+func OpFnDel(linenum int, line *string) *string {
+	return nil
+}
+
 
 /* s	- substitute text */
 type Subst struct {
@@ -93,43 +87,43 @@ func MkOpFnSubst(re *regexp.Regexp, repl string, opts string) LineOpFn {
 				flagI[c - '1'] = true
 		}
 	}
-	return func(linenum int, line string) (int, string) {
-		matches := re.FindAllStringIndex(line, -1)
+	return func(linenum int, line *string) *string {
+		matches := re.FindAllStringIndex(*line, -1)
 		if matches == nil {
 			EdError("no match")
-			return LINE_NOP, ""
+			return line
 		}
-		result := line[0:matches[0][0]]
+		result := (*line)[0:matches[0][0]]
 		for i := 0; i < len(matches); i++ {
 			if i > 0 {
-				result += line[matches[i-1][1]:matches[i][0]]
+				result += (*line)[matches[i-1][1]:matches[i][0]]
 			}
-			for j := 0; j < len(matches[i]); j++ {
+			/*for j := 0; j < len(matches[i]); j++ {
 				print(matches[i][j], " ")
 			}
-			println()
+			println()*/
 			if flagG || (i <= 9 && flagI[i]) {
 				result += repl
 			} else {
-				result += line[matches[i][0]:matches[i][1]]
+				result += (*line)[matches[i][0]:matches[i][1]]
 			}
 		}
-		result += line[matches[len(matches)-1][1]:]
+		result += (*line)[matches[len(matches)-1][1]:]
 		if flagP {
 			os.Stdout.WriteString(result + "\n")
 		}
-		return LINE_REPLACE, result
+		return &result
 	}
 }
 
 
 /* g    - apply a LineOp to lines matching a regex */
-func MkOpFnGlob(re *regexp.Regexp, op *LineOp) LineOpFn {
-	return func(linenum int, line string) (int, string) {
-		if re.MatchString(line) {
+func MkOpFnGlob(buf *Buffer, re *regexp.Regexp, op *LineOp) LineOpFn {
+	return func(linenum int, line *string) *string {
+		if re.MatchString(*line) {
 			return op.fn(linenum, line)
 		}
-		return LINE_NOP, ""
+		return line
 	}
 }
 
@@ -225,7 +219,7 @@ func (op *InputOp) Run(buf *Buffer, r Range) {
 	var insPoint int
 	switch {
 		case op.OpType == INPUT_CHANGE:
-			buf.DeleteLines(r)
+			_ = buf.DeleteLines(r)
 			insPoint = r.line0
 		case op.OpType == INPUT_INSERT:
 			insPoint = r.line0
@@ -238,4 +232,29 @@ func (op *InputOp) Run(buf *Buffer, r Range) {
 			panic("unknown INPUT OpType")
 	}
 	buf.InsertLines(lines, insPoint)
+}
+
+
+/* m	- move lines around */
+type MoveOp struct {
+	destinationLine int
+}
+
+func NewMoveOp(dest int) *MoveOp {
+	var op MoveOp
+	op.destinationLine = dest
+	return &op
+}
+
+func (op *MoveOp) Run(buf *Buffer, r Range) {
+	d := op.destinationLine
+	if d < 0 || d > buf.NumLines()-1 || (d >= r.line0 && d <= r.lineN) {
+		EdError("bad move target")
+		return
+	}
+	tmp := buf.DeleteLines(r)
+	if d > r.lineN {
+		d -= (r.lineN - r.line0) + 1
+	}
+	buf.InsertLines(tmp, d)
 }

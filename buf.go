@@ -107,11 +107,14 @@ func (buf *Buffer) Write(writer *bufio.Writer) os.Error {
 	return err
 }
 
-func (buf *Buffer) DeleteLines(r Range) {
+func (buf *Buffer) DeleteLines(r Range) []string {
 	n := r.lineN - r.line0 + 1
+	deleted := make([]string, n)
+	copy(deleted, buf.lines[r.line0:r.lineN+1])
 	copy(buf.lines[r.line0:len(buf.lines)-n], buf.lines[r.lineN+1:])
 	buf.lines = buf.lines[:len(buf.lines)-n]
 	buf.dirty = true
+	return deleted
 }
 
 func (buf *Buffer) InsertLines(newLines []string, insPoint int) {

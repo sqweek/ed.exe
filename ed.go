@@ -36,11 +36,13 @@ func main() {
 	flag.Parse()
 	if flag.NArg() == 1 {
 		var cmd Cmd
+		b.filename = flag.Arg(0)
 		cmd.r.line0, cmd.r.lineN = 0, 0
-		cmd.op = NewReadOp(flag.Arg(0))
+		cmd.op = NewReadOp(b.filename)
 		cmd.Run(&b)
 	}
 
+	ctx.buf = &b
 	stdin = bufio.NewReader(os.Stdin)
 	for {
 		line, done := EdInput()
@@ -48,7 +50,7 @@ func main() {
 			break
 		}
 		var cmd Cmd
-		cmd.r, cmd.op = CmdParse(line, &b, &ctx)
+		cmd.r, cmd.op = CmdParse(line, &ctx)
 		cmd.Run(&b)
 		_, quit := cmd.op.(*QuitOp)
 		if(quit) {
