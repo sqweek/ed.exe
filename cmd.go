@@ -12,6 +12,8 @@ import (
 type ParseContext struct {
 	buf *Buffer
 
+	prevState []string /* used for undo */
+
 	lastSearch *regexp.Regexp
 	lastReplace *string
 	lastSubstOpts *string
@@ -224,7 +226,7 @@ func parseOp(str string, ctx *ParseContext) (Op, string) {
 				o = new(Nop)
 			} else {
 				i, _ := strconv.Atoi(dest)
-				o = NewMoveOp(i-1)
+				o = NewMoveOp(i)
 			}
 		case c == 'g':
 			search, subcmd, _ := consumeRegex(str[1:])

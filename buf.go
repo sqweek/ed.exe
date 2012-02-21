@@ -70,6 +70,17 @@ func (buf *Buffer) SetLine(i int, str string) {
 	buf.dirty = true
 }
 
+func (buf *Buffer) CopyLines() []string {
+	out := make([]string, len(buf.lines))
+	copy(out, buf.lines)
+	return out
+}
+
+func (buf *Buffer) SetLines(lines []string) {
+	buf.lines = lines
+	buf.dirty = true
+}
+
 /* Reads all the lines available from the reader and adds them to the buffer */
 func (buf *Buffer) Read(rdr *bufio.Reader, filename string) os.Error {
 	prefix := ""
@@ -118,18 +129,16 @@ func (buf *Buffer) DeleteLines(r Range) []string {
 }
 
 func (buf *Buffer) InsertLines(newLines []string, insPoint int) {
-	/* XXX surely there's a better way to grow a slice than this */
 	n := len(newLines)
 	if n == 0 {
 		return
 	}
 	//EdError(fmt.Sprint("InsertLines: got ", n, " lines for ", insPoint))
-	for i := 0; i < n; i++ {
-		//EdError(fmt.Sprint(i, newLines[i]))
-		buf.lines = append(buf.lines, "")
-	}
-	copy(buf.lines[insPoint+n:], buf.lines[insPoint:len(buf.lines)-n])
-	copy(buf.lines[insPoint:insPoint+n], newLines)
+	lines := make([]string, len(buf.lines)+n)
+	copy(lines, buf.lines[:insPoint])
+	copy(lines[insPoint:insPoint+n], newLines)
+	copy(lines[insPoint+n:], buf.lines[insPoint:])
+	buf.lines = lines
 	buf.dirty = true
 }
 
