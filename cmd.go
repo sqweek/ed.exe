@@ -26,11 +26,19 @@ func CmdParse(str string, ctx *ParseContext) (Range, Op) {
 	if addr.line0 == -1 || addr.lineN == -1 {
 		EdError("no match")
 		oper = &nop
-	} else if addr.line0 < 0 || addr.lineN > ctx.buf.NumLines()-1 {
+	} else if addr.line0 < 0 ||
+	  ((ctx.buf.NumLines() > 0) && addr.lineN > ctx.buf.NumLines()-1) ||
+	  ((ctx.buf.NumLines() == 0) && addr.lineN > 0) {
 		EdError("bad range")
 		oper = &nop
 	} else {
 		oper, _ = parseOp(rest, ctx)
+	}
+	if(len(rest) == len(str) && rest[0] == 'g') {
+		/* XXX hack! */
+		/* no range was explicitly specified on g command, default to whole buffer */
+		addr.line0 = 0
+		addr.lineN = ctx.buf.NumLines()-1
 	}
 	return addr, oper
 }
@@ -196,13 +204,15 @@ func parseOp(str string, ctx *ParseContext) (Op, string) {
 							opts = o
 						}
 						ctx.lastReplace = &replace
+					} else {
+						ctx.lastReplace = ""
 					}
 				}
 			}
 			if err != nil {
 				EdError("bad regex")
 				o = new(Nop)
-			} else if ctx.lastSearch == nil || ctx.lastReplace == nil {
+			} else if ctx.lastSearch == nil {
 				EdError("no regex")
 				o = new(Nop)
 			} else {
