@@ -1,0 +1,21 @@
+Implement commands:
+
+e
+f
+G
+j
+k
+l
+v
+t
+u
+W
+x
+y
+z
+
+Bugs:
+
+r doesn't support reading command output via !
+w doesn't support quitting (wq)
+s/// doesn't support \1 \2 etc. in replacement
