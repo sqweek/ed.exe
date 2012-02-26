@@ -205,7 +205,8 @@ func parseOp(str string, ctx *ParseContext) (Op, string) {
 						}
 						ctx.lastReplace = &replace
 					} else {
-						ctx.lastReplace = ""
+						emptyString := ""
+						ctx.lastReplace = &emptyString
 					}
 				}
 			}
