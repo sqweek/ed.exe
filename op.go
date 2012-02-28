@@ -117,10 +117,10 @@ func MkOpFnSubst(re *regexp.Regexp, repl string, opts string) LineOpFn {
 }
 
 
-/* g    - apply a LineOp to lines matching a regex */
-func MkOpFnGlob(buf *Buffer, re *regexp.Regexp, op *LineOp) LineOpFn {
+/* g,v  - apply a LineOp to lines matching/not matching a regex */
+func MkOpFnGlob(buf *Buffer, re *regexp.Regexp, op *LineOp, matchTarget bool) LineOpFn {
 	return func(linenum int, line *string) *string {
-		if re.MatchString(*line) {
+		if re.MatchString(*line) == matchTarget {
 			return op.fn(linenum, line)
 		}
 		return line

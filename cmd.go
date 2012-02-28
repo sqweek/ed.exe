@@ -34,9 +34,9 @@ func CmdParse(str string, ctx *ParseContext) (Range, Op) {
 	} else {
 		oper, _ = parseOp(rest, ctx)
 	}
-	if(len(rest) == len(str) && rest[0] == 'g') {
+	if(len(rest) == len(str) && (rest[0] == 'g' || rest[0] == 'v')) {
 		/* XXX hack! */
-		/* no range was explicitly specified on g command, default to whole buffer */
+		/* no range was explicitly specified on g/v command, default to whole buffer */
 		addr.line0 = 0
 		addr.lineN = ctx.buf.NumLines()-1
 	}
@@ -239,10 +239,10 @@ func parseOp(str string, ctx *ParseContext) (Op, string) {
 				i, _ := strconv.Atoi(dest)
 				o = NewMoveOp(i)
 			}
-		case c == 'g':
+		case c == 'g' || c == 'v':
 			search, subcmd, _ := consumeRegex(str[1:])
 			if len(subcmd) < 1 {
-				EdError("no command supplied for g//")
+				EdError(fmt.Sprint("no command supplied for %c//", c))
 				o = new(Nop)
 			} else if len(search) > 0 {
 				re, err := regexp.Compile(search)
@@ -260,9 +260,9 @@ func parseOp(str string, ctx *ParseContext) (Op, string) {
 				subop, rest = parseOp(subcmd, ctx)
 				lop, isLineOp := subop.(*LineOp)
 				if isLineOp {
-					o = MkLineOp(MkOpFnGlob(ctx.buf, ctx.lastSearch, lop))
+					o = MkLineOp(MkOpFnGlob(ctx.buf, ctx.lastSearch, lop, (c == 'g')))
 				} else {
-					EdError(fmt.Sprintf("can't use '%c' with g//", subcmd[0]))
+					EdError(fmt.Sprint("can't use '%c' with %c//", subcmd[0], c))
 					o = new(Nop)
 				}
 			}	
