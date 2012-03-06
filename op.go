@@ -37,13 +37,18 @@ func (op *LineOp) Run(buf *Buffer, r Range) {
 		if newLine != nil {
 			if newLine != &line {
 				buf.SetLine(i, *newLine)
+				buf.dot = i
 			}
 		} else {
 			deleted = append(deleted, i)
+			buf.dot = i
 		}
 	}
 	for i:=len(deleted)-1; i>=0; i-- {
 		_ = buf.DeleteLines(Range{deleted[i], deleted[i]})
+	}
+	if buf.dot >= buf.NumLines() {
+		buf.dot = buf.NumLines()-1
 	}
 }
 

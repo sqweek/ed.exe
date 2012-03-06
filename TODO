@@ -18,3 +18,4 @@ Bugs:
 r doesn't support reading command output via !
 w doesn't support quitting (wq)
 s/// doesn't support \1 \2 etc. in replacement
+empty command causes index error
