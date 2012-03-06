@@ -34,7 +34,7 @@ func CmdParse(str string, ctx *ParseContext) (Range, Op) {
 	} else {
 		oper, _ = parseOp(rest, ctx)
 	}
-	if(len(rest) == len(str) && (rest[0] == 'g' || rest[0] == 'v')) {
+	if(len(rest) > 0 && len(rest) == len(str) && (rest[0] == 'g' || rest[0] == 'v')) {
 		/* XXX hack! */
 		/* no range was explicitly specified on g/v command, default to whole buffer */
 		addr.line0 = 0
@@ -100,6 +100,11 @@ func consumeAddr(str string, line0 int, ctx *ParseContext) (int, string) {
 				return i-1, rest
 			case str[0] == '-' || str[0] == '+':
 				num, rest := consumeNumber(str[1:])
+				if len(num) == 0 {
+					/* default to next/prev line */
+					num = "1"
+				}
+				/* prefix with sign */
 				num = str[0:1] + num
 				i, _ := strconv.Atoi(num)
 				return ctx.buf.Dot() + i, rest
