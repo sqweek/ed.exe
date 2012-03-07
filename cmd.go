@@ -60,12 +60,15 @@ func parseRange(str string, ctx *ParseContext) (Range, string) {
 func consumeAddr(str string, line0 int, ctx *ParseContext) (int, string) {
 	var searchStart int
 	var defaultLine int
+	var searchWrap bool
 	if line0 == -1 {
 		searchStart = ctx.buf.Dot()
 		defaultLine = ctx.buf.Dot()
+		searchWrap = true
 	} else {
 		searchStart = line0
 		defaultLine = ctx.buf.NumLines()-1
+		searchWrap = false
 	}
 	if len(str) > 0 {
 		switch {
@@ -81,9 +84,9 @@ func consumeAddr(str string, line0 int, ctx *ParseContext) (int, string) {
 					return -1, rest
 				}
 				if str[0] == '/' {
-					return ctx.buf.SearchForward(ctx.lastSearch, searchStart), rest
+					return ctx.buf.SearchForward(ctx.lastSearch, searchStart, searchWrap), rest
 				} else {
-					return ctx.buf.SearchBackward(ctx.lastSearch, searchStart), rest
+					return ctx.buf.SearchBackward(ctx.lastSearch, searchStart, searchWrap), rest
 				}
 			case str[0] == '^':
 				return 0, str[1:]

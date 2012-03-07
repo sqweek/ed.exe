@@ -37,19 +37,33 @@ func (buf *Buffer) Dot() int {
 	return buf.dot
 }
 
-func (buf *Buffer) SearchForward(re *regexp.Regexp, startline int) int {
+func (buf *Buffer) SearchForward(re *regexp.Regexp, startline int, wrap bool) int {
 	for i:=startline+1; i<len(buf.lines); i++ {
 		if re.MatchString(buf.lines[i]) {
 			return i
 		}
 	}
+	if wrap {
+		for i:=0; i<startline+1; i++ {
+			if(re.MatchString(buf.lines[i])) {
+				return i
+			}
+		}
+	}
 	return -1
 }
 
-func (buf *Buffer) SearchBackward(re *regexp.Regexp, startline int) int {
+func (buf *Buffer) SearchBackward(re *regexp.Regexp, startline int, wrap bool) int {
 	for i:=startline-1; i>=0; i-- {
 		if re.MatchString(buf.lines[i]) {
 			return i
+		}
+	}
+	if wrap {
+		for i:=len(buf.lines)-1; i>startline-1; i-- {
+			if re.MatchString(buf.lines[i]) {
+				return i
+			}
 		}
 	}
 	return -1
@@ -79,6 +93,9 @@ func (buf *Buffer) CopyLines() []string {
 func (buf *Buffer) SetLines(lines []string) {
 	buf.lines = lines
 	buf.dirty = true
+	if buf.dot > len(buf.lines) - 1 {
+		buf.dot = len(buf.lines) - 1
+	}
 }
 
 /* Reads all the lines available from the reader and adds them to the buffer */
@@ -145,5 +162,6 @@ func (buf *Buffer) InsertLines(newLines []string, insPoint int) {
 	copy(lines[insPoint+n:], buf.lines[insPoint:])
 	buf.lines = lines
 	buf.dirty = true
+	buf.dot = insPoint + n - 1
 }
 

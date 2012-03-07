@@ -19,3 +19,4 @@ r doesn't support reading command output via !
 w doesn't support quitting (wq)
 s/// doesn't support \1 \2 etc. in replacement
 deleting whole buffer with g/./d leaves ed in broken state
+g/foo/s/bar/qux  reports an error for every line that doesn't match /bar/
