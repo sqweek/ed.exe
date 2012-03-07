@@ -125,6 +125,11 @@ func (buf *Buffer) DeleteLines(r Range) []string {
 	copy(buf.lines[r.line0:len(buf.lines)-n], buf.lines[r.lineN+1:])
 	buf.lines = buf.lines[:len(buf.lines)-n]
 	buf.dirty = true
+	if r.line0 <= len(buf.lines)-1 {
+		buf.dot = r.line0
+	} else {
+		buf.dot = len(buf.lines)-1
+	}
 	return deleted
 }
 
