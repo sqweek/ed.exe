@@ -1,4 +1,4 @@
-package ed
+package main
 
 import (
 	"unicode"
@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"fmt"
-	"os"
 )
 
 type ParseContext struct {
@@ -96,7 +95,7 @@ func consumeAddr(str string, line0 int, ctx *ParseContext) (int, string) {
 				return ctx.buf.NumLines()-1, str[1:]
 			case str[0] == '.':
 				return ctx.buf.Dot(), str[1:]
-			case unicode.IsDigit(int(str[0])):
+			case unicode.IsDigit(rune(str[0])):
 				num, rest := consumeNumber(str)
 				i, _ := strconv.Atoi(num)
 				/* subtract 1 to map from user line number to internal array index */
@@ -133,7 +132,7 @@ func consumeRegex(str string) (string, string, bool) {
 
 func consumeNumber(str string) (string, string) {
 	var i int
-	for i = 0; i < len(str) && unicode.IsDigit(int(str[i])); i++ {
+	for i = 0; i < len(str) && unicode.IsDigit(rune(str[i])); i++ {
 	}
 	return str[:i], str[i:]
 }
@@ -192,7 +191,7 @@ func parseOp(str string, ctx *ParseContext) (Op, string) {
 		case c == 's':
 			var match, replace, opts string
 			var terminated, terminated2 bool
-			var err os.Error
+			var err error
 			var re *regexp.Regexp
 			opts = "1p"
 			if len(str) > 1 {

@@ -1,4 +1,4 @@
-package ed
+package main
 
 import (
 	"regexp"
@@ -143,13 +143,13 @@ func (op *ReadOp) Run(buf *Buffer, r Range) {
 	/* TODO trigger error on invalid range */
 	f, err := os.Open(op.filename)
 	if err != nil {
-		EdError(op.filename + ": " + err.String())
+		EdError(op.filename + ": " + err.Error())
 		return
 	}
 	rdr := bufio.NewReader(f)
 	err = buf.Read(rdr, op.filename)
 	if err != nil {
-		EdError(op.filename + ": " + err.String())
+		EdError(op.filename + ": " + err.Error())
 	}
 	f.Close()
 }
@@ -169,13 +169,13 @@ func NewWriteOp(filename string) *WriteOp {
 func (op *WriteOp) Run(buf *Buffer, r Range) {
 	f, err := os.Create(op.filename)
 	if err != nil {
-		EdError(op.filename + ": " + err.String())
+		EdError(op.filename + ": " + err.Error())
 		return
 	}
 	writer := bufio.NewWriter(f)
 	err = buf.Write(writer)
 	if err != nil {
-		EdError(op.filename + ": " + err.String())
+		EdError(op.filename + ": " + err.Error())
 	}
 	f.Close()
 }

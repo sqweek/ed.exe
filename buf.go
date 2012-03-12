@@ -1,9 +1,9 @@
-package ed
+package main
 
 import (
 	"bufio"
 	"regexp"
-	"os"
+	"io"
 	//"fmt"
 )
 
@@ -99,11 +99,11 @@ func (buf *Buffer) SetLines(lines []string) {
 }
 
 /* Reads all the lines available from the reader and adds them to the buffer */
-func (buf *Buffer) Read(rdr *bufio.Reader, filename string) os.Error {
+func (buf *Buffer) Read(rdr *bufio.Reader, filename string) error {
 	prefix := ""
 	for {
 		segment, isPrefix, err := rdr.ReadLine()
-		if err == os.EOF {
+		if err == io.EOF {
 			return nil
 		} else if err != nil {
 			return err
@@ -121,8 +121,8 @@ func (buf *Buffer) Read(rdr *bufio.Reader, filename string) os.Error {
 	return nil
 }
 
-func (buf *Buffer) Write(writer *bufio.Writer) os.Error {
-	var err os.Error
+func (buf *Buffer) Write(writer *bufio.Writer) error {
+	var err error
 	for i := 0; i < len(buf.lines); i++ {
 		/* TODO try to write remaining bytes on error */
 		_, e := writer.WriteString(buf.lines[i]+"\n")
